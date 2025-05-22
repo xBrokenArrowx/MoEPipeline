@@ -68,4 +68,11 @@ Running this script will create a results folder inside the `bfcl/result` direct
 
 The `-FC` part is just because BFCL has some weird distinction between certain models I don't fully understand it but you need to add it for some of the models. See the above link.
 
+## Further Customization
 
+There are a lot of arguments that are not being used in the scripts. Feel free to checkout the github for both BFCL, and MoE-PEFT to discover more of the options.
+
+I think `python MoE-PEFT/launch.py help` will display a list of options that can be passed.
+The `gen` argument also creates a editable config file called `MoE-PEFT/moe-peft.json` with more arguments.
+
+Feel free to use the scripts for an understanding of the process flow rather than needing to be used all the time.
