@@ -11,3 +11,5 @@ wheels/
 venv/
 models/**/*
 *.ipynb
+results/**/*
+scores/**/*
