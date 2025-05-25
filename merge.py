@@ -24,10 +24,7 @@ def main():
     )
 
     args = parser.parse_args()
-
     assert os.path.isdir(args.adapter_dir), "Specified directory for the adapter does not exist"
-
-    
 
     peft_config = PeftConfig.from_pretrained(args.adapter_dir)
     base_model = AutoModelForCausalLM.from_pretrained(peft_config.base_model_name_or_path)

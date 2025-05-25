@@ -6,8 +6,8 @@
 # for example of the dataset see MoE-PEFT/tests/dummy_data.json
 #
 # example of calling this script: ./run_moe.sh Qwen/Qwen2.5-1.5B-Instruct yahma/alpaca-cleaned my_cool_adapter
-batch=16
-epochs=2
+batch=64
+epochs=1
 
 echo "Generating Config"
 echo "Making new model in models/$3"

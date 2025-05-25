@@ -48,7 +48,7 @@ To create an adapter MoE we want to use `./run_moe.sh` this takes a couple of co
 
 ### Example of `./run_moe.sh`
 
-`./run_moe.sh Qwen/Qwen2.5-1.5B-Instruct recast_fixed_fr.json coolest_adapter`
+`./run_moe.sh Qwen/Qwen2.5-1.5B-Instruct datasets/recast/recast_fixed_fr.json coolest_adapter`
 
 This will perform the MoE adapter training on Qwen2.5-1.5B-Instruct using the `recast_fixed_fr.json` dataset. Naming the model `coolest_adapter` which will appear in the `models` directory as a usable model for BFCL/VLLM as `coolest_adapter_merged`. Ensure you used the merged version for later steps it is the only way to be usable for BFCL
 
