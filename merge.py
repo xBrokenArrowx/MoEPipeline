@@ -4,6 +4,7 @@ import json
 import os
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel, PeftConfig
+from mixlora import MixLoraModelForCausalLM
 
 
 def main():
@@ -26,16 +27,20 @@ def main():
     args = parser.parse_args()
     assert os.path.isdir(args.adapter_dir), "Specified directory for the adapter does not exist"
 
-    peft_config = PeftConfig.from_pretrained(args.adapter_dir)
-    base_model = AutoModelForCausalLM.from_pretrained(peft_config.base_model_name_or_path)
+    try:
+        config = PeftConfig.from_pretrained(args.adapter_dir)
+        base_model = AutoModelForCausalLM.from_pretrained(config.base_model_name_or_path)
+        
+        model = PeftModel.from_pretrained(base_model, args.adapter_dir)
+        model = model.merge_and_unload()
+    except KeyError:
+        model, config = MixLoraModelForCausalLM.from_pretrained(args.adapter_dir)
 
-    model = PeftModel.from_pretrained(base_model, args.adapter_dir)
-
-    model = model.merge_and_unload()
+    
 
     model.save_pretrained(args.output_dir)
 
-    tokenizer = AutoTokenizer.from_pretrained(peft_config.base_model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(config.base_model_name_or_path)
     tokenizer.save_pretrained(args.output_dir)
 
     print("Finished merging models")
