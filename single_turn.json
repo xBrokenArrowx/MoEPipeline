@@ -1,0 +1,19 @@
+[
+   "bfcl/data/BFCL_v3_javascript.json",
+   "bfcl/data/BFCL_v3_multi_turn_base.json",
+   "bfcl/data/BFCL_v3_live_multiple.json",
+   "bfcl/data/BFCL_v3_live_parallel.json",
+   "bfcl/data/BFCL_v3_live_relevance.json",
+   "bfcl/data/BFCL_v3_parallel_multiple.json",
+   "bfcl/data/BFCL_v3_simple.json",
+   "bfcl/data/BFCL_v3_multi_turn_long_context.json",
+   "bfcl/data/BFCL_v3_parallel.json",
+   "bfcl/data/BFCL_v3_multiple.json",
+   "bfcl/data/BFCL_v3_java.json",
+   "bfcl/data/BFCL_v3_live_parallel_multiple.json",
+   "bfcl/data/BFCL_v3_live_simple.json",
+   "bfcl/data/BFCL_v3_multi_turn_miss_param.json",
+   "bfcl/data/BFCL_v3_multi_turn_miss_func.json",
+   "bfcl/data/BFCL_v3_irrelevance.json",
+   "bfcl/data/BFCL_v3_live_irrelevance.json"
+]
