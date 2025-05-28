@@ -8,12 +8,13 @@
 # example of calling this script: ./run_moe.sh Qwen/Qwen2.5-1.5B-Instruct yahma/alpaca-cleaned my_cool_adapter
 batch=64
 epochs=1
+export CUDA_VISIBLE_DEVICES=1
 
 echo "Generating Config"
 echo "Making new model in models/$3"
 
 python ./MoE-PEFT/launch.py gen \
-    --template lora \
+    --template mixlora \
     --tasks $2 \
     --adapter_name "models/$3" \
     --batch_size $batch \

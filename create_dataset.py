@@ -9,7 +9,8 @@ ds = load_dataset("Salesforce/xlam-function-calling-60k", split="train")
 list_data = []
 count = 0
 for i in ds:
-    if count >= 100:
+    # Limit to roughly half dataset
+    if count >= 5000: 
         break
     count += 1
     tools = i["tools"]

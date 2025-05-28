@@ -68,6 +68,23 @@ Running this script will create a results folder inside the `bfcl/result` direct
 
 The `-FC` part is just because BFCL has some weird distinction between certain models I don't fully understand it but you need to add it for some of the models. See the above link.
 
+## MixLora
+### Creating a MixLora model
+
+Change `lora` to `mixlora` in `./run_moe.sh`. Run as normal:
+`./run_moe.sh Qwen/Qwen2.5-1.5B-Instruct datasets/recast/xlam.json coolest_adapter`
+
+### Scoring on BFCL
+
+To generate predictions on the `bfcl` dataset, run:
+
+`python mix_lora_runner.py -a models/coolest_adapter_0`
+
+To score the predictions, run:
+
+`bfcl evaluate --model Qwen/Qwen2.5-1.5B-Instruct-FC --test-category single_turn  --result-dir ../results/  --score-dir ../scores/`
+
+
 ## Further Customization
 
 There are a lot of arguments that are not being used in the scripts. Feel free to checkout the github for both BFCL, and MoE-PEFT to discover more of the options.

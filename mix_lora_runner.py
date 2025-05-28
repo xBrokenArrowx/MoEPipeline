@@ -2,14 +2,15 @@
 import argparse
 import os
 import json
+import gc
 
 import torch
 import pandas as pd
-from mixlora import MixLoraModelForCausalLM
 from transformers import AutoTokenizer
 from tqdm import tqdm
+from mixlora_mods import MixLoraModelForCausalLM  # Rewrote MixLora to be used on GPU
 
-DEFAULT_BATCH_SIZE = 32
+DEFAULT_BATCH_SIZE = 64  # Might run out of memory with 64 on GPUs
 DEFAULT_OUTPUT = 'results/'
 DEFAULT_PROMPT = """You are a helpful assistant with access to the following functions to help
 you answer queries from the user. Based on the user's query, use the functions if required.
@@ -57,13 +58,16 @@ def generate_results(model:MixLoraModelForCausalLM, tokenizer:AutoTokenizer, tes
     for i in tqdm(range(0, len(questions), batch_size), desc=f'Running inference on {test}'):
         batch = questions[i:i+batch_size]
         inputs = tokenizer(batch, padding=True, truncation=True, return_tensors="pt")
-        # Move tensors to model device if needed
         inputs = {k: v.to(model.device) for k, v in inputs.items()}
         with torch.no_grad():
-            outputs = model.generate(**inputs)
+            outputs = model.generate(**inputs, max_new_tokens=128)
         decoded = tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
         results.extend(decoded)
+
+        del inputs, outputs, decoded
+        torch.cuda.empty_cache()
+        gc.collect()
 
     df['result'] = results
 
@@ -93,13 +97,17 @@ def main():
 
     print("\n", '-'*20, '\n')
     print(f'Running Eval with args:\n\tAdapter: {args.adapter}\n\tOutput Dir: {args.output}\n\tTest File: {args.test}')
-    
+
     print("Loading Model")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model, config = MixLoraModelForCausalLM.from_pretrained(args.adapter)
+    model = model.to(device)
+
     print("Loading Tokenizer")
     tokenizer = AutoTokenizer.from_pretrained(config.base_model_name_or_path)
+    tokenizer.padding_side = 'left' # HuggingFace will cry if you don't do this
     
-    tests = load_tests_paths(args.test) #load test files
+    tests = load_tests_paths(args.test) # load test files
 
     #Set up output directories
     model_name = fix_model_name(args.adapter)
@@ -109,17 +117,8 @@ def main():
     for test in tests:
         test_name = os.path.basename(test)
         df = generate_results(model, tokenizer, test, args.batch_size)
-
         save_results(output_dir, test_name, df)
     
-
-
-    
-
-
-
-
-
 if __name__ == "__main__":
     main()
 
