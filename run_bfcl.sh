@@ -1,4 +1,4 @@
-
+export CUDA_VISIBLE_DEVICES=1
 bfcl generate \
     --model $1 \
     --test-category single_turn \
