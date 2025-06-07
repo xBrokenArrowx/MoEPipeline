@@ -12,17 +12,16 @@ from mixlora_mods import MixLoraModelForCausalLM  # Rewrote MixLora to be used o
 
 DEFAULT_BATCH_SIZE = 32  # Might run out of memory with 64 on GPUs
 DEFAULT_OUTPUT = 'results/'
-DEFAULT_PROMPT = """You are a helpful assistant with access to the following functions to help
-you answer queries from the user. Based on the user's query, use the functions if required.
+DEFAULT_PROMPT_PATH = 'prompts/default.txt'
 
-Some rules you always follow:
-1. You always respond with valid code: fn_name(arg=value)
-2. If the function is not relevant to answer the query, notify the user why.
-3. If no function is provided, say you don't have access to any functions.
+def get_best_device():
+    """Just return the most performant device we can use in order: Cuda, MPS, CPU"""
+    if torch.cuda.is_available():
+        return "cuda"
+    if torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
 
-functions:
-{{tools}}
-"""
 def fix_model_name(model_path:str)->str:
     """Replace \ with _ to generate a name for the model (should be like models_your_model_name)"""
     model_name = model_path.replace('/', '_')
@@ -38,23 +37,21 @@ def rel_path(file:str) -> str:
     """return a relative path to this file"""
     return os.path.join(os.path.dirname(__file__), file)
 
-def add_message(question:list, tools:dict):
+def add_message(prompt:str, question:list, tools:dict):
     """Add our prompt to the user query and incorperate the tools"""
     
-    prompt = DEFAULT_PROMPT.format(tools)
+    formatted = prompt.format(tools=tools)
     query = question[0][0]['content']
 
-    return f'{prompt}\n\n{query}\n\nAssistant:'
+    return f'{formatted}\n\n{query}\n\nAssistant:'
 
-def generate_results(model:MixLoraModelForCausalLM, tokenizer:AutoTokenizer, test:str, batch_size)->pd.DataFrame:
+def generate_results(model:MixLoraModelForCausalLM, tokenizer:AutoTokenizer, test:str, batch_size:int, prompt:str)->pd.DataFrame:
     """Run batch inference on input test"""
     df = pd.read_json(test, lines=True, orient='records')
-    df['question_formatted'] = df.apply(lambda row: add_message(row['question'], row.get('function', {})), axis=1)
+    df['question_formatted'] = df.apply(lambda row: add_message(prompt, row['question'], row.get('function', [])), axis=1)
 
     questions = df['question_formatted'].to_list()
-
     results = []
-
     for i in tqdm(range(0, len(questions), batch_size), desc=f'Running inference on {test}'):
         batch = questions[i:i+batch_size]
         inputs = tokenizer(batch, padding=True, truncation=True, return_tensors="pt", max_length=256)
@@ -95,15 +92,26 @@ def main():
     parser.add_argument('-o', '--output', type=str, default=DEFAULT_OUTPUT, help='Output directory (defaults to "results/" in the main dir of the repo)')
     parser.add_argument('-t', '--test', default='single_turn.json', help='File containing a list of paths to evaluate from (default runs all the single turn tests)')
     parser.add_argument('-b', '--batch_size', default=DEFAULT_BATCH_SIZE, type=int, help='Batch size for inference')
+    parser.add_argument('-p', '--prompt', type=str, default=DEFAULT_PROMPT_PATH, help="File path to prompt")
 
     args = parser.parse_args()
     assert args.adapter and os.path.isdir(args.adapter), "Did not pass an adapter folder, or was not a folder"
 
+    try:
+        with open(args.prompt, 'r') as f:
+            prompt = f.read()
+            
+    except FileNotFoundError as e:
+        print('Unable to find prompt file')
+        raise e
+
     print("\n", '-'*20, '\n')
-    print(f'Running Eval with args:\n\tAdapter: {args.adapter}\n\tOutput Dir: {args.output}\n\tTest File: {args.test}')
+    print(f'Running Eval with args:\n\tAdapter: {args.adapter}\n\tOutput Dir: {args.output}\n\tTest File: {args.test}\n\tPrompt File: {args.prompt}')
 
     print("Loading Model")
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device_name = get_best_device()
+    print(f'Most Suitable Device: {device_name}')
+    device = torch.device(device_name)
     model, config = MixLoraModelForCausalLM.from_pretrained(args.adapter)
     model = model.to(device)
     print(f"Running on device: {torch.cuda.current_device()}")
@@ -121,7 +129,7 @@ def main():
 
     for test in tests:
         test_name = os.path.basename(test)
-        df = generate_results(model, tokenizer, test, args.batch_size)
+        df = generate_results(model, tokenizer, test, args.batch_size, prompt)
         save_results(output_dir, test_name, df)
     
 if __name__ == "__main__":

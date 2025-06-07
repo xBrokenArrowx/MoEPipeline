@@ -15,3 +15,5 @@ models/**/*
 results/**/*
 scores/**/*
 datasets/recast/xlam.json
+
+.vscode/
