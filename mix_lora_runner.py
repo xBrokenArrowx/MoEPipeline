@@ -43,7 +43,7 @@ def add_message(prompt:str, question:list, tools:dict):
     formatted = prompt.format(tools=tools)
     query = question[0][0]['content']
 
-    return f'{formatted}\n\n{query}\n\nAssistant:'
+    return f'System:\n{formatted}\n\nUser\n\n{query}\n\nAssistant:'
 
 def generate_results(model:MixLoraModelForCausalLM, tokenizer:AutoTokenizer, test:str, batch_size:int, prompt:str)->pd.DataFrame:
     """Run batch inference on input test"""
@@ -54,21 +54,17 @@ def generate_results(model:MixLoraModelForCausalLM, tokenizer:AutoTokenizer, tes
     results = []
     for i in tqdm(range(0, len(questions), batch_size), desc=f'Running inference on {test}'):
         batch = questions[i:i+batch_size]
-        inputs = tokenizer(batch, padding=True, truncation=True, return_tensors="pt", max_length=256)
+        inputs = tokenizer(batch, padding=True, truncation=True, return_tensors="pt")
         inputs = {k: v.to(model.device) for k, v in inputs.items()}
-        print(f"(Before training) GPU Memory Allocated: {torch.cuda.memory_allocated(model.device) / 1024**3:.2f} GiB")
-        print(f"(Before training) GPU Memory Reserved: {torch.cuda.memory_reserved(model.device) / 1024**3:.2f} GiB")
+        
         with torch.no_grad():
             outputs = model.generate(**inputs, max_new_tokens=256)
         decoded = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-        print(f"(After training) GPU Memory Allocated: {torch.cuda.memory_allocated(model.device) / 1024**3:.2f} GiB")
-        print(f"(After training) GPU Memory Reserved: {torch.cuda.memory_reserved(model.device) / 1024**3:.2f} GiB")
-        print(model.device)
-        results.extend(decoded)
 
-        del inputs, outputs, decoded
-        torch.cuda.empty_cache()
-        gc.collect()
+        decoded = [x[x.find('Assistant:')+len('Assistant:'):] for x in decoded]
+        
+        
+        results.extend(decoded)
 
     df['result'] = results
 

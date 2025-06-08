@@ -6,29 +6,29 @@
 # for example of the dataset see MoE-PEFT/tests/dummy_data.json
 #
 # example of calling this script: ./run_moe.sh Qwen/Qwen2.5-1.5B-Instruct yahma/alpaca-cleaned my_cool_adapter
-batch=64
-epochs=1
-export CUDA_VISIBLE_DEVICES=1
+batch=32
+epochs=5
+model=Qwen/Qwen2.5-1.5B-Instruct
 
 echo "Generating Config"
-echo "Making new model in models/$3"
+echo "Making new model in models/$2"
 
 python ./MoE-PEFT/launch.py gen \
     --template mixlora \
-    --tasks $2 \
-    --adapter_name "models/$3" \
+    --tasks $1 \
+    --adapter_name "models/$2" \
     --batch_size $batch \
     --num_epochs $epochs
 
 
 python ./MoE-PEFT/moe_peft.py \
-    --base_model $1 \
+    --base_model $model \
     --config ./MoE-PEFT/moe_peft.json \
     --bf16
 
-python merge.py \
-    -a "models/${3}_0" \
-    -o "models/${3}_merged"
+#python merge.py \
+#    -a "models/${3}_0" \
+#    -o "models/${3}_merged"
 
-echo "Model should be available in models/${3}_merged"
+#echo "Model should be available in models/${3}_merged"
 
