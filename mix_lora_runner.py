@@ -68,6 +68,12 @@ def generate_results(model:MixLoraModelForCausalLM, tokenizer:AutoTokenizer, tes
 
     df['result'] = results
 
+    try:
+        torch.cuda.empty_cache()
+        gc.collect()
+    except:
+        print('unable to clean memory')
+        
     return df
 
 def save_results(output_dir:str, test_name:str, df:pd.DataFrame)->None:
@@ -110,7 +116,10 @@ def main():
     device = torch.device(device_name)
     model, config = MixLoraModelForCausalLM.from_pretrained(args.adapter)
     model = model.to(device)
+    model.gradient_checkpointing_enable()
     print(f"Running on device: {torch.cuda.current_device()}")
+    torch.backends.cudnn.benchmark = True
+    torch.backends.cuda.matmul.allow_tf32 = True  
 
     print("Loading Tokenizer")
     tokenizer = AutoTokenizer.from_pretrained(config.base_model_name_or_path)
@@ -125,8 +134,14 @@ def main():
 
     for test in tests:
         test_name = os.path.basename(test)
-        df = generate_results(model, tokenizer, test, args.batch_size, prompt)
-        save_results(output_dir, test_name, df)
+        if os.path.exists(os.path.join(output_dir,test_name)):
+            continue
+        try:
+            df = generate_results(model, tokenizer, test, args.batch_size, prompt)
+            save_results(output_dir, test_name, df)
+        except Exception as e:
+            print(e)
+            print(f'Unable to generate results for test: {test_name}')
     
 if __name__ == "__main__":
     main()
