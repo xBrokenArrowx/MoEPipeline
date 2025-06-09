@@ -6,7 +6,7 @@ import gc
 
 import torch
 import pandas as pd
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, BitsAndBytesConfig
 from tqdm import tqdm
 from mixlora_mods import MixLoraModelForCausalLM  # Rewrote MixLora to be used on GPU
 
@@ -43,7 +43,7 @@ def add_message(prompt:str, question:list, tools:dict):
     formatted = prompt.format(tools=tools)
     query = question[0][0]['content']
 
-    return f'{formatted}\n\n{query}\n\nAssistant:'
+    return f'System:\n{formatted}\n\nUser\n\n{query}\n\nAssistant:'
 
 def generate_results(model:MixLoraModelForCausalLM, tokenizer:AutoTokenizer, test:str, batch_size:int, prompt:str)->pd.DataFrame:
     """Run batch inference on input test"""
@@ -54,24 +54,26 @@ def generate_results(model:MixLoraModelForCausalLM, tokenizer:AutoTokenizer, tes
     results = []
     for i in tqdm(range(0, len(questions), batch_size), desc=f'Running inference on {test}'):
         batch = questions[i:i+batch_size]
-        inputs = tokenizer(batch, padding=True, truncation=True, return_tensors="pt", max_length=256)
+        inputs = tokenizer(batch, padding=True, truncation=True, return_tensors="pt")
         inputs = {k: v.to(model.device) for k, v in inputs.items()}
-        print(f"(Before training) GPU Memory Allocated: {torch.cuda.memory_allocated(model.device) / 1024**3:.2f} GiB")
-        print(f"(Before training) GPU Memory Reserved: {torch.cuda.memory_reserved(model.device) / 1024**3:.2f} GiB")
+        
         with torch.no_grad():
             outputs = model.generate(**inputs, max_new_tokens=256)
         decoded = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-        print(f"(After training) GPU Memory Allocated: {torch.cuda.memory_allocated(model.device) / 1024**3:.2f} GiB")
-        print(f"(After training) GPU Memory Reserved: {torch.cuda.memory_reserved(model.device) / 1024**3:.2f} GiB")
-        print(model.device)
-        results.extend(decoded)
 
-        del inputs, outputs, decoded
-        torch.cuda.empty_cache()
-        gc.collect()
+        decoded = [x[x.find('Assistant:')+len('Assistant:'):] for x in decoded]
+        
+        
+        results.extend(decoded)
 
     df['result'] = results
 
+    try:
+        torch.cuda.empty_cache()
+        gc.collect()
+    except:
+        print('unable to clean memory')
+        
     return df
 
 def save_results(output_dir:str, test_name:str, df:pd.DataFrame)->None:
@@ -79,7 +81,6 @@ def save_results(output_dir:str, test_name:str, df:pd.DataFrame)->None:
     path = rel_path(os.path.join(output_dir, test_name))
     df['result'] = df['result'].apply(lambda x: x.split('Assistant:')[-1].strip())
     df[['id', 'result']].to_json(path, lines=True, orient='records', index=False)
-
 
 def main():
     """Main"""
@@ -112,9 +113,13 @@ def main():
     device_name = get_best_device()
     print(f'Most Suitable Device: {device_name}')
     device = torch.device(device_name)
-    model, config = MixLoraModelForCausalLM.from_pretrained(args.adapter)
-    model = model.to(device)
+    bnb_config = BitsAndBytesConfig(load_in_8bit=True, llm_int8_threshold=6.0)
+    model, config = MixLoraModelForCausalLM.from_pretrained(args.adapter, config=bnb_config, device_map="auto")
+    # model = model.to(device)
+    model.gradient_checkpointing_enable()
     print(f"Running on device: {torch.cuda.current_device()}")
+    torch.backends.cudnn.benchmark = True
+    torch.backends.cuda.matmul.allow_tf32 = True  
 
     print("Loading Tokenizer")
     tokenizer = AutoTokenizer.from_pretrained(config.base_model_name_or_path)
@@ -129,9 +134,14 @@ def main():
 
     for test in tests:
         test_name = os.path.basename(test)
-        df = generate_results(model, tokenizer, test, args.batch_size, prompt)
-        save_results(output_dir, test_name, df)
+        if os.path.exists(os.path.join(output_dir,test_name)):
+            continue
+        try:
+            df = generate_results(model, tokenizer, test, args.batch_size, prompt)
+            save_results(output_dir, test_name, df)
+        except Exception as e:
+            print(e)
+            print(f'Unable to generate results for test: {test_name}')
     
 if __name__ == "__main__":
     main()
-
